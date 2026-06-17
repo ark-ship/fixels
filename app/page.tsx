@@ -80,6 +80,13 @@ const FIXELS_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "bool" }],
   },
+  {
+    type: "function",
+    name: "totalRepaired",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
 ] as const;
 
 const PATCH_COLORS: PatchColor[] = [
@@ -145,6 +152,20 @@ export default function Home() {
     address: CONTRACT_ADDRESS,
     abi: FIXELS_ABI,
     functionName: "repairOpen",
+    chainId: TARGET_CHAIN.id,
+    query: {
+      enabled: isContractReady,
+      refetchInterval: 3000,
+    },
+  });
+
+  const {
+    data: totalRepairedFromChain,
+    refetch: refetchTotalRepaired,
+  } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: FIXELS_ABI,
+    functionName: "totalRepaired",
     chainId: TARGET_CHAIN.id,
     query: {
       enabled: isContractReady,
@@ -279,7 +300,9 @@ export default function Home() {
     setPendingRepair(null);
     setRepairHash(undefined);
     refetchRepairOpen();
-  }, [isConfirmed, pendingRepair, refetchRepairOpen]);
+    refetchTotalRepaired();
+    setRefreshNonce((current) => current + 1);
+  }, [isConfirmed, pendingRepair, refetchRepairOpen, refetchTotalRepaired]);
 
   const repairedMap = useMemo(() => {
     const map = new Map<string, RepairEntry>();
@@ -300,7 +323,12 @@ export default function Home() {
   }, [entries, wallet]);
 
   const totalPixels = CANVAS_SIZE * CANVAS_SIZE;
-  const repairedCount = entries.length;
+
+  const repairedCount =
+    totalRepairedFromChain !== undefined
+      ? Number(totalRepairedFromChain)
+      : entries.length;
+
   const repairedPercent = Math.min(100, Math.round((repairedCount / totalPixels) * 100));
 
   const repairIsOpen = repairOpen === true;
@@ -443,6 +471,7 @@ Repair one pixel. Become a Fixel.`;
     window.localStorage.removeItem(STORAGE_KEY);
     setRefreshNonce((current) => current + 1);
     refetchRepairOpen();
+    refetchTotalRepaired();
   }
 
   return (
@@ -481,6 +510,7 @@ Repair one pixel. Become a Fixel.`;
           <div>Debug Chain ID: {chainId}</div>
           <div>Debug Target Chain: {TARGET_CHAIN.id}</div>
           <div>Debug Repair Open: {String(repairOpen)}</div>
+          <div>Debug Total Repaired: {String(totalRepairedFromChain)}</div>
           <div>Debug Loading: {String(repairOpenLoading)}</div>
           <div>Debug Error: {repairOpenError ? repairOpenError.message : "none"}</div>
         </div>
@@ -792,7 +822,7 @@ Repair one pixel. Become a Fixel.`;
             <span>03</span>
             <h3>Discord Roles</h3>
             <p>
-              Repaired wallets can enter Discord with roles based on their repaired pixel, patch color, and zone.
+              Discord roles can be based on repaired wallet data from the canvas.
             </p>
           </div>
         </div>
