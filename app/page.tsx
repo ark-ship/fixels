@@ -39,15 +39,11 @@ const SHOW_DEBUG = false;
 const CONTRACT_ADDRESS =
   "0x2cfF3d4F83D5E7A3f6D087e936712d2C80a8E52e" as `0x${string}`;
 
-const CONTRACT_START_BLOCK = (() => {
-  try {
-    return BigInt(process.env.NEXT_PUBLIC_CONTRACT_START_BLOCK || "0");
-  } catch {
-    return 0n;
-  }
-})();
+// Hardcode deploy/start block supaya semua browser bisa baca event PixelRepaired
+const CONTRACT_START_BLOCK = 25334800n;
 
-const LOG_CHUNK_SIZE = 5000n;
+// Chunk kecil supaya RPC tidak berat / error
+const LOG_CHUNK_SIZE = 1000n;
 
 const STORAGE_KEY = `fixels_repairs_${TARGET_CHAIN.id}_${CONTRACT_ADDRESS.toLowerCase()}`;
 
@@ -188,26 +184,6 @@ export default function Home() {
       try {
         if (!isContractReady) {
           setEntries([]);
-          return;
-        }
-
-        if (CONTRACT_START_BLOCK === 0n) {
-          console.warn("Missing NEXT_PUBLIC_CONTRACT_START_BLOCK. Set deploy block for mainnet.");
-
-          const saved = window.localStorage.getItem(STORAGE_KEY);
-
-          if (!saved) {
-            setEntries([]);
-            return;
-          }
-
-          try {
-            const parsed = JSON.parse(saved) as RepairEntry[];
-            setEntries(Array.isArray(parsed) ? parsed : []);
-          } catch {
-            setEntries([]);
-          }
-
           return;
         }
 
@@ -511,6 +487,7 @@ Repair one pixel. Become a Fixel.`;
           <div>Debug Target Chain: {TARGET_CHAIN.id}</div>
           <div>Debug Repair Open: {String(repairOpen)}</div>
           <div>Debug Total Repaired: {String(totalRepairedFromChain)}</div>
+          <div>Debug Entries From Logs: {String(entries.length)}</div>
           <div>Debug Loading: {String(repairOpenLoading)}</div>
           <div>Debug Error: {repairOpenError ? repairOpenError.message : "none"}</div>
         </div>
