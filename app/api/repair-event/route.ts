@@ -189,7 +189,32 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const secret = url.searchParams.get("secret");
+  const test = url.searchParams.get("test");
+
+  if (process.env.ALCHEMY_WEBHOOK_SECRET) {
+    if (secret !== process.env.ALCHEMY_WEBHOOK_SECRET) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  if (test === "1") {
+    await sendDiscordMessage({
+      x: 12,
+      y: 44,
+      colorName: "Repair Red",
+      colorEmoji: "🟥",
+      colorHex: "#ff4d4d",
+    });
+
+    return Response.json({
+      ok: true,
+      message: "Test repair message sent to Discord.",
+    });
+  }
+
   return Response.json({
     ok: true,
     message: "Fixels repair webhook is live.",
