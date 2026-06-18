@@ -37,7 +37,10 @@ function collectLogs(input: any, output: any[] = []) {
   if (!input) return output;
 
   if (Array.isArray(input)) {
-    for (const item of input) collectLogs(item, output);
+    for (const item of input) {
+      collectLogs(item, output);
+    }
+
     return output;
   }
 
@@ -130,6 +133,7 @@ export async function POST(request: Request) {
     const logs = collectLogs(body);
 
     let sent = 0;
+    const sentKeys = new Set<string>();
 
     for (const log of logs) {
       const topics = log.topics || [];
@@ -160,6 +164,10 @@ export async function POST(request: Request) {
 
       const color = PATCH_COLORS[colorIndex] || PATCH_COLORS[0];
 
+      const uniqueKey = `${x}-${y}-${colorIndex}`;
+
+      if (sentKeys.has(uniqueKey)) continue;
+
       await sendDiscordMessage({
         x,
         y,
@@ -168,6 +176,7 @@ export async function POST(request: Request) {
         colorHex: color.hex,
       });
 
+      sentKeys.add(uniqueKey);
       sent++;
     }
 
@@ -189,32 +198,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const secret = url.searchParams.get("secret");
-  const test = url.searchParams.get("test");
-
-  if (process.env.ALCHEMY_WEBHOOK_SECRET) {
-    if (secret !== process.env.ALCHEMY_WEBHOOK_SECRET) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
-  if (test === "1") {
-    await sendDiscordMessage({
-      x: 12,
-      y: 44,
-      colorName: "Repair Red",
-      colorEmoji: "🟥",
-      colorHex: "#ff4d4d",
-    });
-
-    return Response.json({
-      ok: true,
-      message: "Test repair message sent to Discord.",
-    });
-  }
-
+export async function GET() {
   return Response.json({
     ok: true,
     message: "Fixels repair webhook is live.",
