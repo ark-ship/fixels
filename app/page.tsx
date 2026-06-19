@@ -170,18 +170,20 @@ export default function Home() {
     });
 
   useEffect(() => {
-    if (!publicClient) return;
+  if (!publicClient) return;
 
-    let cancelled = false;
+  const client = publicClient;
 
-    async function loadRepairsFromChain() {
+  let cancelled = false;
+
+  async function loadRepairsFromChain() {
       try {
         if (!isContractReady) {
           setEntries([]);
           return;
         }
 
-        const latestBlock = await publicClient.getBlockNumber();
+        const latestBlock = await client.getBlockNumber();
         let fromBlock = CONTRACT_START_BLOCK;
         const chainEntries: RepairEntry[] = [];
 
@@ -191,7 +193,7 @@ export default function Home() {
               ? latestBlock
               : fromBlock + LOG_CHUNK_SIZE;
 
-          const logs = await publicClient.getLogs({
+          const logs = await client.getLogs({
             address: CONTRACT_ADDRESS,
             event: parseAbiItem(
               "event PixelRepaired(address indexed wallet, uint8 x, uint8 y, uint8 colorIndex)"
