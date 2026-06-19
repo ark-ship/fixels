@@ -2,7 +2,7 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useMemo } from "react";
-import { type Address, formatEther, parseAbi, parseEventLogs } from "viem";
+import { type Address, parseAbi, parseEventLogs } from "viem";
 import {
   useAccount,
   useChainId,
@@ -17,6 +17,9 @@ const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "0x2cfF3d4F83D5E7A3f6D087e936712d2C80a8E52e") as Address;
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+
+const WL_PRICE_TEXT = "Free";
+const PUBLIC_PRICE_TEXT = "0.0005 ETH";
 
 const FIXELS_ABI = parseAbi([
   "function repairMintOpen() view returns (bool)",
@@ -189,15 +192,6 @@ export default function RepairMintPage() {
     return decodeTokenURI(mintedTokenURI);
   }, [mintedTokenURI]);
 
-  const priceText =
-  repairMintOpen === true
-    ? repairMintPrice === undefined
-      ? "Loading"
-      : repairMintPrice === 0n
-      ? "Free"
-      : `${formatEther(repairMintPrice)} ETH`
-    : "TBA";
-
   const canMint =
     isConnected &&
     !isWrongChain &&
@@ -263,8 +257,13 @@ export default function RepairMintPage() {
             </div>
 
             <div>
-              <span>Mint Price</span>
-              <strong>{priceText}</strong>
+              <span>WL Price</span>
+              <strong>{WL_PRICE_TEXT}</strong>
+            </div>
+
+            <div>
+              <span>Public Price</span>
+              <strong>{PUBLIC_PRICE_TEXT}</strong>
             </div>
 
             <div>
@@ -401,7 +400,9 @@ export default function RepairMintPage() {
               <p>Token</p>
               <h3>{tokenMeta?.name || "Fixels"}</h3>
 
-              {mintedTokenId && <span className="tokenId">Token ID #{mintedTokenId.toString()}</span>}
+              {mintedTokenId && (
+                <span className="tokenId">Token ID #{mintedTokenId.toString()}</span>
+              )}
 
               <div className="attrs">
                 {tokenMeta?.attributes?.map((attr) => (
@@ -536,7 +537,7 @@ export default function RepairMintPage() {
 
         .stats {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 12px;
           margin-top: 34px;
         }

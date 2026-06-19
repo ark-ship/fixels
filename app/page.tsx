@@ -34,16 +34,22 @@ const TARGET_CHAIN = mainnet;
 const CHAIN_NAME = "Ethereum";
 const EXPLORER_TX_URL = "https://etherscan.io/tx";
 
-const SHOW_DEBUG = false;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
-const CONTRACT_ADDRESS =
-  "0x2cfF3d4F83D5E7A3f6D087e936712d2C80a8E52e" as `0x${string}`;
+const CONTRACT_ADDRESS = (
+  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+  "0x2cfF3d4F83D5E7A3f6D087e936712d2C80a8E52e"
+) as `0x${string}`;
 
-// Hardcode deploy/start block supaya semua browser bisa baca event PixelRepaired
-const CONTRACT_START_BLOCK = 25334800n;
+const LOG_CHUNK_SIZE = 5000n;
 
-// Chunk kecil supaya RPC tidak berat / error
-const LOG_CHUNK_SIZE = 1000n;
+const CONTRACT_START_BLOCK = (() => {
+  try {
+    return BigInt(process.env.NEXT_PUBLIC_CONTRACT_START_BLOCK || "25334800");
+  } catch {
+    return 25334800n;
+  }
+})();
 
 const STORAGE_KEY = `fixels_repairs_${TARGET_CHAIN.id}_${CONTRACT_ADDRESS.toLowerCase()}`;
 
@@ -113,12 +119,15 @@ export default function Home() {
 
   const wallet = address || "";
   const isCorrectNetwork = chainId === TARGET_CHAIN.id;
-  const isContractReady = Boolean(CONTRACT_ADDRESS);
+  const isContractReady = CONTRACT_ADDRESS !== ZERO_ADDRESS;
 
   const publicClient = usePublicClient({ chainId: TARGET_CHAIN.id });
 
   const [entries, setEntries] = useState<RepairEntry[]>([]);
-  const [selectedPixel, setSelectedPixel] = useState<{ x: number; y: number } | null>(null);
+  const [selectedPixel, setSelectedPixel] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [selectedColor, setSelectedColor] = useState<PatchColor>(PATCH_COLORS[0]);
   const [receipt, setReceipt] = useState<RepairEntry | null>(null);
   const [error, setError] = useState("");
@@ -132,40 +141,26 @@ export default function Home() {
     address: CONTRACT_ADDRESS,
     abi: FIXELS_ABI,
     functionName: "repairFee",
-    chainId: TARGET_CHAIN.id,
     query: {
       enabled: isContractReady,
-      refetchInterval: 3000,
     },
   });
 
-  const {
-    data: repairOpen,
-    isLoading: repairOpenLoading,
-    error: repairOpenError,
-    refetch: refetchRepairOpen,
-  } = useReadContract({
+  const { data: repairOpen } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: FIXELS_ABI,
     functionName: "repairOpen",
-    chainId: TARGET_CHAIN.id,
     query: {
       enabled: isContractReady,
-      refetchInterval: 3000,
     },
   });
 
-  const {
-    data: totalRepairedFromChain,
-    refetch: refetchTotalRepaired,
-  } = useReadContract({
+  const { data: totalRepairedFromChain } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: FIXELS_ABI,
     functionName: "totalRepaired",
-    chainId: TARGET_CHAIN.id,
     query: {
       enabled: isContractReady,
-      refetchInterval: 3000,
     },
   });
 
@@ -177,7 +172,6 @@ export default function Home() {
   useEffect(() => {
     if (!publicClient) return;
 
-    const client = publicClient;
     let cancelled = false;
 
     async function loadRepairsFromChain() {
@@ -187,7 +181,7 @@ export default function Home() {
           return;
         }
 
-        const latestBlock = await client.getBlockNumber();
+        const latestBlock = await publicClient.getBlockNumber();
         let fromBlock = CONTRACT_START_BLOCK;
         const chainEntries: RepairEntry[] = [];
 
@@ -197,7 +191,7 @@ export default function Home() {
               ? latestBlock
               : fromBlock + LOG_CHUNK_SIZE;
 
-          const logs = await client.getLogs({
+          const logs = await publicClient.getLogs({
             address: CONTRACT_ADDRESS,
             event: parseAbiItem(
               "event PixelRepaired(address indexed wallet, uint8 x, uint8 y, uint8 colorIndex)"
@@ -267,7 +261,6 @@ export default function Home() {
 
       const updated = [...currentEntries, pendingRepair];
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-
       return updated;
     });
 
@@ -275,10 +268,7 @@ export default function Home() {
     setSelectedPixel(null);
     setPendingRepair(null);
     setRepairHash(undefined);
-    refetchRepairOpen();
-    refetchTotalRepaired();
-    setRefreshNonce((current) => current + 1);
-  }, [isConfirmed, pendingRepair, refetchRepairOpen, refetchTotalRepaired]);
+  }, [isConfirmed, pendingRepair]);
 
   const repairedMap = useMemo(() => {
     const map = new Map<string, RepairEntry>();
@@ -294,7 +284,8 @@ export default function Home() {
     if (!wallet) return null;
 
     return (
-      entries.find((entry) => entry.wallet.toLowerCase() === wallet.toLowerCase()) || null
+      entries.find((entry) => entry.wallet.toLowerCase() === wallet.toLowerCase()) ||
+      null
     );
   }, [entries, wallet]);
 
@@ -305,9 +296,10 @@ export default function Home() {
       ? Number(totalRepairedFromChain)
       : entries.length;
 
-  const repairedPercent = Math.min(100, Math.round((repairedCount / totalPixels) * 100));
-
-  const repairIsOpen = repairOpen === true;
+  const repairedPercent = Math.min(
+    100,
+    Math.round((repairedCount / totalPixels) * 100)
+  );
 
   function selectPixel(x: number, y: number) {
     setError("");
@@ -316,9 +308,11 @@ export default function Home() {
 
     if (repairedMap.has(key)) {
       const owner = repairedMap.get(key);
-
-      setError(`Pixel X${x}-Y${y} has already been repaired by ${shortWallet(owner?.wallet || "")}.`);
-
+      setError(
+        `Pixel X${x}-Y${y} has already been repaired by ${shortWallet(
+          owner?.wallet || ""
+        )}.`
+      );
       return;
     }
 
@@ -345,17 +339,7 @@ export default function Home() {
       return;
     }
 
-    if (repairOpenLoading) {
-      setError("Repair status is still loading. Try again.");
-      return;
-    }
-
-    if (repairOpenError) {
-      setError("Could not read repair status from contract. Refresh and try again.");
-      return;
-    }
-
-    if (!repairIsOpen) {
+    if (repairOpen !== true) {
       setError("Repair is not open yet.");
       return;
     }
@@ -375,7 +359,9 @@ export default function Home() {
     );
 
     if (alreadyJoined) {
-      setError("This wallet has already repaired one pixel and secured a Repair Mint spot.");
+      setError(
+        "This wallet has already repaired one pixel and secured a Repair Mint spot."
+      );
       return;
     }
 
@@ -446,8 +432,6 @@ Repair one pixel. Become a Fixel.`;
     setRepairHash(undefined);
     window.localStorage.removeItem(STORAGE_KEY);
     setRefreshNonce((current) => current + 1);
-    refetchRepairOpen();
-    refetchTotalRepaired();
   }
 
   return (
@@ -469,35 +453,11 @@ Repair one pixel. Become a Fixel.`;
         <ConnectButton />
       </nav>
 
-      {SHOW_DEBUG && (
-        <div
-          style={{
-            width: "min(1180px, calc(100% - 32px))",
-            margin: "12px auto",
-            padding: 14,
-            border: "3px solid #111",
-            background: "#fff8e6",
-            fontFamily: "monospace",
-            fontWeight: 900,
-            wordBreak: "break-word",
-          }}
-        >
-          <div>Debug Contract: {CONTRACT_ADDRESS}</div>
-          <div>Debug Chain ID: {chainId}</div>
-          <div>Debug Target Chain: {TARGET_CHAIN.id}</div>
-          <div>Debug Repair Open: {String(repairOpen)}</div>
-          <div>Debug Total Repaired: {String(totalRepairedFromChain)}</div>
-          <div>Debug Entries From Logs: {String(entries.length)}</div>
-          <div>Debug Loading: {String(repairOpenLoading)}</div>
-          <div>Debug Error: {repairOpenError ? repairOpenError.message : "none"}</div>
-        </div>
-      )}
-
       <section className="hero">
         <div className="heroText">
           <div className="eyebrow">
             <span className="liveDot" />
-            {repairIsOpen ? "Repair is open" : "Repair is closed"}
+            {repairOpen ? "Repair is open" : "Repair is closed"}
           </div>
 
           <h1>
@@ -508,7 +468,7 @@ Repair one pixel. Become a Fixel.`;
 
           <p className="heroDesc">
             Fixels are onchain pixel workers born from repaired pixels.
-            Leave your mark on the Broken Canvas.
+            Leave your mark on the broken canvas.
           </p>
 
           <div className="heroActions">
@@ -524,13 +484,19 @@ Repair one pixel. Become a Fixel.`;
         <div className="heroCard heroCardStatusOnly">
           <div className="heroCardInfo heroCardInfoOnly">
             <p>Canvas Status</p>
-            <h3>{repairedCount} pixels repaired</h3>
+
+            <h3>
+              {repairedCount}/{totalPixels} repaired
+            </h3>
 
             <div className="progressOuter">
-              <div className="progressInner" style={{ width: `${repairedPercent}%` }} />
+              <div
+                className="progressInner"
+                style={{ width: `${repairedPercent}%` }}
+              />
             </div>
 
-            <span>{repairedPercent}% of Broken Canvas repaired</span>
+            <span>{repairedPercent}% of canvas repaired</span>
 
             <div className="networkBox">
               <span>Network</span>
@@ -697,20 +663,13 @@ Repair one pixel. Become a Fixel.`;
               <button
                 className="submitButton"
                 onClick={submitRepair}
-                disabled={
-                  isWriting ||
-                  isConfirming ||
-                  repairOpenLoading ||
-                  !repairIsOpen
-                }
+                disabled={isWriting || isConfirming || repairOpen !== true}
               >
                 {isWriting
                   ? "Confirm in Wallet..."
                   : isConfirming
                   ? "Repairing..."
-                  : repairOpenLoading
-                  ? "Loading..."
-                  : !repairIsOpen
+                  : repairOpen !== true
                   ? "Repair Closed"
                   : "Repair Pixel"}
               </button>
@@ -783,7 +742,8 @@ Repair one pixel. Become a Fixel.`;
             <span>01</span>
             <h3>Repair Phase</h3>
             <p>
-              Connect your wallet and repair one empty pixel. One wallet can only repair one coordinate.
+              Connect your wallet and repair one empty pixel. One wallet can only
+              repair one coordinate.
             </p>
           </div>
 
@@ -791,7 +751,8 @@ Repair one pixel. Become a Fixel.`;
             <span>02</span>
             <h3>Repair Mint</h3>
             <p>
-              Repaired wallets receive mint access and metadata based on their coordinate and patch color.
+              Repaired wallets receive mint access and metadata based on their
+              coordinate and patch color.
             </p>
           </div>
 
@@ -799,7 +760,8 @@ Repair one pixel. Become a Fixel.`;
             <span>03</span>
             <h3>Discord Roles</h3>
             <p>
-              Discord roles can be based on repaired wallet data from the canvas.
+              Repaired wallets can enter Discord with roles based on their repaired
+              pixel, patch color, and zone.
             </p>
           </div>
         </div>
