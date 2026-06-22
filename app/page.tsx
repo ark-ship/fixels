@@ -170,84 +170,97 @@ export default function Home() {
     });
 
   useEffect(() => {
-  if (!publicClient) return;
+  if (!publicClient || !isContractReady) return;
 
   const client = publicClient;
-
   let cancelled = false;
 
   async function loadRepairsFromChain() {
-      try {
-        if (!isContractReady) {
-          setEntries([]);
-          return;
-        }
-
-        const latestBlock = await client.getBlockNumber();
-        let fromBlock = CONTRACT_START_BLOCK;
-        const chainEntries: RepairEntry[] = [];
-
-        while (fromBlock <= latestBlock) {
-          const toBlock =
-            fromBlock + LOG_CHUNK_SIZE > latestBlock
-              ? latestBlock
-              : fromBlock + LOG_CHUNK_SIZE;
-
-          const logs = await client.getLogs({
-            address: CONTRACT_ADDRESS,
-            event: parseAbiItem(
-              "event PixelRepaired(address indexed wallet, uint8 x, uint8 y, uint8 colorIndex)"
-            ),
-            fromBlock,
-            toBlock,
-          });
-
-          for (const log of logs) {
-            const colorIndex = Number(log.args.colorIndex);
-            const patchColor = PATCH_COLORS[colorIndex] || PATCH_COLORS[0];
-
-            chainEntries.push({
-              wallet: String(log.args.wallet),
-              x: Number(log.args.x),
-              y: Number(log.args.y),
-              color: patchColor.value,
-              colorName: patchColor.name,
-              timestamp: Number(log.blockNumber || 0n),
-            });
-          }
-
-          fromBlock = toBlock + 1n;
-        }
-
-        if (!cancelled) {
-          setEntries(chainEntries);
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(chainEntries));
-        }
-      } catch (err) {
-        console.error("Failed to load repairs from chain:", err);
-
-        const saved = window.localStorage.getItem(STORAGE_KEY);
-
-        if (!saved) {
-          setEntries([]);
-          return;
-        }
-
+    try {
+      // 1. Load cache dulu biar canvas tidak blank
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved) {
         try {
           const parsed = JSON.parse(saved) as RepairEntry[];
-          setEntries(Array.isArray(parsed) ? parsed : []);
-        } catch {
-          setEntries([]);
+          if (!cancelled && Array.isArray(parsed) && parsed.length > 0) {
+            setEntries(parsed);
+          }
+        } catch {}
+      }
+
+      const latestBlock = await client.getBlockNumber();
+      let fromBlock = CONTRACT_START_BLOCK;
+
+      const chainEntries: RepairEntry[] = [];
+      const seen = new Set<string>();
+
+      while (fromBlock <= latestBlock) {
+        const toBlock =
+          fromBlock + LOG_CHUNK_SIZE > latestBlock
+            ? latestBlock
+            : fromBlock + LOG_CHUNK_SIZE;
+
+        const logs = await client.getLogs({
+          address: CONTRACT_ADDRESS,
+          event: parseAbiItem(
+            "event PixelRepaired(address indexed wallet, uint8 x, uint8 y, uint8 colorIndex)"
+          ),
+          fromBlock,
+          toBlock,
+        });
+
+        for (const log of logs) {
+          const colorIndex = Number(log.args.colorIndex);
+          const patchColor = PATCH_COLORS[colorIndex] || PATCH_COLORS[0];
+
+          const x = Number(log.args.x);
+          const y = Number(log.args.y);
+          const key = coordinateKey(x, y);
+
+          // hindari duplikat
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          chainEntries.push({
+            wallet: String(log.args.wallet),
+            x,
+            y,
+            color: patchColor.value,
+            colorName: patchColor.name,
+            timestamp: Number(log.blockNumber || 0n),
+          });
         }
+
+        fromBlock = toBlock + 1n;
+      }
+
+      if (!cancelled && chainEntries.length > 0) {
+        setEntries(chainEntries);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(chainEntries));
+      }
+    } catch (err) {
+      console.error("Failed to load repairs from chain:", err);
+
+      // kalau RPC gagal, jangan kosongkan canvas
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as RepairEntry[];
+          if (!cancelled && Array.isArray(parsed)) {
+            setEntries(parsed);
+          }
+        } catch {}
       }
     }
+  }
 
-    loadRepairsFromChain();
+  loadRepairsFromChain();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [publicClient, refreshNonce, isContractReady]);
+  return () => {
+    cancelled = true;
+  };
+}, [publicClient, refreshNonce, isContractReady]);
 
   useEffect(() => {
     if (!isConfirmed || !pendingRepair) return;
@@ -427,14 +440,15 @@ Repair one pixel. Become a Fixel.`;
   }
 
   function refreshCanvas() {
-    setReceipt(null);
-    setSelectedPixel(null);
-    setError("");
-    setPendingRepair(null);
-    setRepairHash(undefined);
-    window.localStorage.removeItem(STORAGE_KEY);
-    setRefreshNonce((current) => current + 1);
-  }
+  setReceipt(null);
+  setSelectedPixel(null);
+  setError("");
+  setPendingRepair(null);
+  setRepairHash(undefined);
+
+  // jangan hapus cache, nanti canvas blank kalau RPC error
+  setRefreshNonce((current) => current + 1);
+}
 
   return (
     <main className="site">

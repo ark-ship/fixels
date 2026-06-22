@@ -16,7 +16,7 @@ const config = getDefaultConfig({
   transports: {
     [mainnet.id]: http(
       process.env.NEXT_PUBLIC_ETH_RPC_URL ||
-        "https://ethereum-rpc.publicnode.com"
+        "https://ethereum-rpc.publicnode.com/"
     ),
   },
   ssr: true,
