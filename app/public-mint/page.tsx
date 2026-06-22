@@ -18,7 +18,7 @@ const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
-const PUBLIC_PRICE_TEXT = "0.00015 ETH";
+const PUBLIC_PRICE_TEXT = "0.000085 ETH";
 
 const FIXELS_ABI = parseAbi([
   "function publicMintOpen() view returns (bool)",
