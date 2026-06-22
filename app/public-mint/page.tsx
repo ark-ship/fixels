@@ -18,19 +18,19 @@ const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
-const WL_PRICE_TEXT = "Free";
-const PUBLIC_PRICE_TEXT = "0.0002 ETH";
+const PUBLIC_PRICE_TEXT = "0.00015 ETH";
 
 const FIXELS_ABI = parseAbi([
-  "function repairMintOpen() view returns (bool)",
-  "function repairMintPrice() view returns (uint256)",
+  "function publicMintOpen() view returns (bool)",
+  "function publicMintPrice() view returns (uint256)",
   "function totalSupply() view returns (uint256)",
   "function maxSupply() view returns (uint256)",
-  "function repairMinted(address wallet) view returns (bool)",
-  "function getRepair(address wallet) view returns (bool repaired, uint8 x, uint8 y, uint8 colorIndex, uint64 repairedAt)",
-  "function mintRepair() payable",
-  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function publicMinted(address wallet) view returns (uint256)",
+  "function maxPublicMintPerWallet() view returns (uint256)",
+  "function maxPublicMintPerTx() view returns (uint256)",
+  "function mintPublic(uint256 quantity) payable",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
 ]);
 
 type TokenMeta = {
@@ -82,7 +82,7 @@ function zoneName(x: number) {
   return "Glitch Zone";
 }
 
-export default function RepairMintPage() {
+export default function PublicMintPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
@@ -103,19 +103,20 @@ export default function RepairMintPage() {
   });
 
   const account = address || ZERO_ADDRESS;
+  const quantity = 1n;
   const isWrongChain = isConnected && chainId !== mainnet.id;
 
-  const { data: repairMintOpen } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FIXELS_ABI,
-    functionName: "repairMintOpen",
-  });
+  const { data: publicMintOpen } = useReadContract({
+  address: CONTRACT_ADDRESS,
+  abi: FIXELS_ABI,
+  functionName: "publicMintOpen",
+});
 
-  const { data: repairMintPrice } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FIXELS_ABI,
-    functionName: "repairMintPrice",
-  });
+  const { data: publicMintPrice } = useReadContract({
+  address: CONTRACT_ADDRESS,
+  abi: FIXELS_ABI,
+  functionName: "publicMintPrice",
+});
 
   const { data: totalSupply } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -129,30 +130,15 @@ export default function RepairMintPage() {
     functionName: "maxSupply",
   });
 
-  const { data: repairData } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FIXELS_ABI,
-    functionName: "getRepair",
-    args: [account],
-    query: {
-      enabled: isConnected,
-    },
-  });
-
-  const { data: alreadyMinted } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: FIXELS_ABI,
-    functionName: "repairMinted",
-    args: [account],
-    query: {
-      enabled: isConnected,
-    },
-  });
-
-  const hasRepaired = Boolean(repairData?.[0]);
-  const repairX = Number(repairData?.[1] || 0);
-  const repairY = Number(repairData?.[2] || 0);
-  const repairColorIndex = Number(repairData?.[3] || 0);
+  const { data: publicMinted } = useReadContract({
+  address: CONTRACT_ADDRESS,
+  abi: FIXELS_ABI,
+  functionName: "publicMinted",
+  args: [account],
+  query: {
+    enabled: isConnected,
+  },
+});
 
   const mintedTokenId = useMemo(() => {
     if (!receipt?.logs || !address) return null;
@@ -193,25 +179,24 @@ export default function RepairMintPage() {
   }, [mintedTokenURI]);
 
   const canMint =
-    isConnected &&
-    !isWrongChain &&
-    repairMintOpen &&
-    hasRepaired &&
-    !alreadyMinted &&
-    !isMintWaiting &&
-    !isConfirming;
+  isConnected &&
+  !isWrongChain &&
+  publicMintOpen &&
+  !isMintWaiting &&
+  !isConfirming;
 
-  function handleMintRepair() {
-    if (!repairMintPrice && repairMintPrice !== 0n) return;
+  function handleMintPublic() {
+  if (!publicMintPrice && publicMintPrice !== 0n) return;
 
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: FIXELS_ABI,
-      functionName: "mintRepair",
-      value: repairMintPrice,
-      chainId: mainnet.id,
-    });
-  }
+  writeContract({
+    address: CONTRACT_ADDRESS,
+    abi: FIXELS_ABI,
+    functionName: "mintPublic",
+    args: [quantity],
+    value: publicMintPrice * quantity,
+    chainId: mainnet.id,
+  });
+}
 
   return (
     <main className="page">
@@ -225,7 +210,7 @@ export default function RepairMintPage() {
 
         <div className="navRight">
           <a href="/">Canvas</a>
-          <a href="/repair-mint">Repair Mint</a>
+          <a href="/public-mint">Public Mint</a>
           <ConnectButton />
         </div>
       </nav>
@@ -234,13 +219,13 @@ export default function RepairMintPage() {
         <div className="heroText">
           <div className="badge">
             <span />
-            Repair Mint
+            Public Mint
           </div>
 
           <h1>
-            Mint from your
+            Public Mint
             <br />
-            repaired pixel.
+            Is Live.
           </h1>
 
           <p>
@@ -257,19 +242,14 @@ export default function RepairMintPage() {
             </div>
 
             <div>
-              <span>WL Price</span>
-              <strong>{WL_PRICE_TEXT}</strong>
-            </div>
+  <span>Mint Price</span>
+  <strong>{PUBLIC_PRICE_TEXT}</strong>
+</div>
 
-            <div>
-              <span>Public Price</span>
-              <strong>{PUBLIC_PRICE_TEXT}</strong>
-            </div>
-
-            <div>
-              <span>Status</span>
-              <strong>{repairMintOpen ? "Open" : "Closed"}</strong>
-            </div>
+<div>
+  <span>Status</span>
+  <strong>{publicMintOpen ? "Open" : "Closed"}</strong>
+</div>
           </div>
         </div>
 
@@ -297,86 +277,57 @@ export default function RepairMintPage() {
             </div>
           )}
 
-          {isConnected && !isWrongChain && (
-            <>
-              <div className="repairBox">
-                <span>Repair Status</span>
+          <>
+  <div className="repairBox">
+    <span>Public Mint Status</span>
+    <strong className={publicMintOpen ? "green" : "red"}>
+      {publicMintOpen ? "OPEN" : "CLOSED"}
+    </strong>
+  </div>
 
-                {hasRepaired ? (
-                  <strong className="green">Repaired</strong>
-                ) : (
-                  <strong className="red">Not repaired</strong>
-                )}
-              </div>
+  <div className="receipt">
+    <div>
+      <span>Price</span>
+      <strong>{PUBLIC_PRICE_TEXT}</strong>
+    </div>
 
-              {hasRepaired && (
-                <div className="receipt">
-                  <div>
-                    <span>Coordinate</span>
-                    <strong>
-                      X{repairX}-Y{repairY}
-                    </strong>
-                  </div>
+    <div>
+      <span>Minted By Wallet</span>
+      <strong>{publicMinted?.toString() || "0"}</strong>
+    </div>
+  </div>
 
-                  <div>
-                    <span>Patch Color</span>
-                    <strong>{colorName(repairColorIndex)}</strong>
-                  </div>
+  <button
+    className="mintButton"
+    disabled={!canMint}
+    onClick={handleMintPublic}
+  >
+    {isMintWaiting
+      ? "Confirm in wallet..."
+      : isConfirming
+      ? "Minting..."
+      : "Mint Fixel"}
+  </button>
 
-                  <div>
-                    <span>Zone</span>
-                    <strong>{zoneName(repairX)}</strong>
-                  </div>
-                </div>
-              )}
+  {mintHash && (
+    <div className="txBox">
+      <span>Transaction</span>
+      <a
+        href={`https://etherscan.io/tx/${mintHash}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        View on Etherscan
+      </a>
+    </div>
+  )}
 
-              {alreadyMinted && (
-                <div className="notice">
-                  <strong>Already minted</strong>
-                  <span>This wallet already claimed Repair Mint.</span>
-                </div>
-              )}
-
-              {!hasRepaired && (
-                <div className="notice danger">
-                  <strong>No repair found</strong>
-                  <span>Repair one pixel first on the Broken Canvas.</span>
-                </div>
-              )}
-
-              {!repairMintOpen && (
-                <div className="notice danger">
-                  <strong>Repair Mint closed</strong>
-                  <span>Repair Mint is not open yet.</span>
-                </div>
-              )}
-
-              <button className="mintButton" disabled={!canMint} onClick={handleMintRepair}>
-                {isMintWaiting
-                  ? "Confirm in wallet..."
-                  : isConfirming
-                  ? "Minting..."
-                  : alreadyMinted
-                  ? "Already Minted"
-                  : "Mint Repair NFT"}
-              </button>
-
-              {mintHash && (
-                <div className="txBox">
-                  <span>Transaction</span>
-                  <a
-                    href={`https://etherscan.io/tx/${mintHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View on Etherscan
-                  </a>
-                </div>
-              )}
-
-              {mintError && <p className="errorText">{mintError.message}</p>}
-            </>
-          )}
+  {mintError && (
+    <p className="errorText">
+      {mintError.message}
+    </p>
+  )}
+</>
         </div>
       </section>
 
