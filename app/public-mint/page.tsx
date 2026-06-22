@@ -1,7 +1,6 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useMemo } from "react";
 import { type Address, parseAbi, parseEventLogs } from "viem";
 import {
   useAccount,
@@ -12,6 +11,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { mainnet } from "wagmi/chains";
+import { useMemo, useState } from "react";
 
 const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "0x2cfF3d4F83D5E7A3f6D087e936712d2C80a8E52e") as Address;
@@ -103,7 +103,7 @@ export default function PublicMintPage() {
   });
 
   const account = address || ZERO_ADDRESS;
-  const quantity = 1n;
+  const [quantity, setQuantity] = useState(1);
   const isWrongChain = isConnected && chainId !== mainnet.id;
 
   const { data: publicMintOpen } = useReadContract({
@@ -192,8 +192,8 @@ export default function PublicMintPage() {
     address: CONTRACT_ADDRESS,
     abi: FIXELS_ABI,
     functionName: "mintPublic",
-    args: [quantity],
-    value: publicMintPrice * quantity,
+    args: [BigInt(quantity)],
+    value: publicMintPrice * BigInt(quantity),
     chainId: mainnet.id,
   });
 }
@@ -297,6 +297,44 @@ export default function PublicMintPage() {
     </div>
   </div>
 
+<div className="quantityBox">
+  <span>Quantity</span>
+
+  <div className="quantityControls">
+    <button
+      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+    >
+      -
+    </button>
+
+    <strong>{quantity}</strong>
+
+    <button
+      onClick={() => setQuantity(Math.min(20, quantity + 1))}
+    >
+      +
+    </button>
+  </div>
+</div>
+
+<div className="receipt">
+  <div>
+    <span>Quantity</span>
+    <strong>{quantity}</strong>
+  </div>
+
+  <div>
+    <span>Total Cost</span>
+    <strong>
+      {(
+        Number(publicMintPrice || 0n) /
+        1e18 *
+        quantity
+      ).toFixed(5)} ETH
+    </strong>
+  </div>
+</div>
+
   <button
     className="mintButton"
     disabled={!canMint}
@@ -306,7 +344,7 @@ export default function PublicMintPage() {
       ? "Confirm in wallet..."
       : isConfirming
       ? "Minting..."
-      : "Mint Fixel"}
+      : "Mint Fixels"}
   </button>
 
   {mintHash && (
@@ -369,6 +407,32 @@ export default function PublicMintPage() {
       )}
 
       <style jsx>{`
+.quantityBox {
+  margin-bottom: 16px;
+}
+
+.quantityControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quantityControls button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: #59f0ff;
+  color: #111;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.quantityControls strong {
+  min-width: 40px;
+  text-align: center;
+  font-size: 20px;
+}
+
         .page {
           min-height: 100vh;
           background: #f3ecd8;
