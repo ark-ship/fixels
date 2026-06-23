@@ -18,7 +18,7 @@ const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
-const PUBLIC_PRICE_TEXT = "0.000085 ETH";
+const PUBLIC_PRICE_TEXT = "Free";
 
 const FIXELS_ABI = parseAbi([
   "function publicMintOpen() view returns (bool)",
@@ -278,24 +278,20 @@ export default function PublicMintPage() {
           )}
 
           <>
-  <div className="repairBox">
-    <span>Public Mint Status</span>
-    <strong className={publicMintOpen ? "green" : "red"}>
-      {publicMintOpen ? "OPEN" : "CLOSED"}
-    </strong>
-  </div>
+  
+<div className="repairBox">
+  <span>Public Mint Status</span>
+  <strong className={publicMintOpen ? "green" : "red"}>
+    {publicMintOpen ? "OPEN" : "CLOSED"}
+  </strong>
+</div>
 
-  <div className="receipt">
-    <div>
-      <span>Price</span>
-      <strong>{PUBLIC_PRICE_TEXT}</strong>
-    </div>
-
-    <div>
-      <span>Minted By Wallet</span>
-      <strong>{publicMinted?.toString() || "0"}</strong>
-    </div>
+<div className="receipt">
+  <div>
+    <span>Minted By Wallet</span>
+    <strong>{publicMinted?.toString() || "0"}</strong>
   </div>
+</div>
 
 <div className="quantityBox">
   <span>Quantity</span>
@@ -310,28 +306,10 @@ export default function PublicMintPage() {
     <strong>{quantity}</strong>
 
     <button
-      onClick={() => setQuantity(Math.min(20, quantity + 1))}
+      onClick={() => setQuantity(Math.min(5, quantity + 1))}
     >
       +
     </button>
-  </div>
-</div>
-
-<div className="receipt">
-  <div>
-    <span>Quantity</span>
-    <strong>{quantity}</strong>
-  </div>
-
-  <div>
-    <span>Total Cost</span>
-    <strong>
-      {(
-        Number(publicMintPrice || 0n) /
-        1e18 *
-        quantity
-      ).toFixed(5)} ETH
-    </strong>
   </div>
 </div>
 
