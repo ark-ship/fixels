@@ -306,7 +306,7 @@ export default function PublicMintPage() {
     <strong>{quantity}</strong>
 
     <button
-      onClick={() => setQuantity(Math.min(10, quantity + 1))}
+      onClick={() => setQuantity(Math.min(20, quantity + 1))}
     >
       +
     </button>
